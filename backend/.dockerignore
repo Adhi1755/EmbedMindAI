@@ -1,0 +1,25 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.env
+*.env
+
+# Uploads & generated data (mount as volumes instead)
+uploads/
+chromadb_storage/
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore

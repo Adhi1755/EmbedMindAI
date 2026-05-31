@@ -10,6 +10,8 @@ import FileUpload from './FileUpload';
 import Header from './Header';
 import { jwtDecode } from "jwt-decode";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 
 
 
@@ -37,7 +39,7 @@ const ChatContainer: React.FC = () => {
 
 
 useEffect(() => {
-  fetch("http://localhost:8000/auth/me", {
+  fetch(`${API_URL}/auth/me`, {
     credentials: "include",
   })
     .then(res => res.json())

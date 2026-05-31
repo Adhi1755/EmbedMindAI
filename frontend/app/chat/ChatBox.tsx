@@ -6,6 +6,8 @@ import { ArrowRight,  Plus, X } from 'lucide-react';
 import { uploadPDF } from '../lib/api';
 import { useUploadStore } from '../components/stores/UploadStore';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 interface ChatInputProps {
   onSendMessage: (text: string) => void;
 }
@@ -17,7 +19,7 @@ const ChatInputBox:  React.FC<ChatInputProps> = ({ onSendMessage }) => {
   
     const deletePDF = async (filename: string): Promise<void> => {
   try {
-    const res = await fetch(`http://127.0.0.1:8000/delete?filename=${encodeURIComponent(filename)}`, {
+    const res = await fetch(`${API_URL}/delete?filename=${encodeURIComponent(filename)}`, {
       method: "DELETE",
     });
 

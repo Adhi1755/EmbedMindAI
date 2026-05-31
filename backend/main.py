@@ -1,4 +1,5 @@
 # main.py - Only minimal changes needed for ChromaDB compatibility
+import os
 
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,9 +45,13 @@ async def notify_clients(message: str):
         connected_clients.remove(dc)
 
 
+# Support multiple origins via env var (comma-separated) for Docker / production flexibility
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Your frontend
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

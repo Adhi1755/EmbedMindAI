@@ -39,9 +39,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ node, inline, className, children, ...props }) {
+          code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || "");
-            return !inline && match ? (
+            // In react-markdown v9, `inline` prop was removed.
+            // Detect inline code by absence of a language class and no newlines.
+            const isInline = !match && !String(children).includes("\n");
+            return !isInline && match ? (
               <SyntaxHighlighter
                 style={oneDark}
                 language={match[1]}

@@ -270,7 +270,7 @@ const LandingPage = () => {
 
     const ctx = canvas.getContext("2d");
     let animationId;
-    let stars = [];
+    const stars = [];
     let w = window.innerWidth;
     let h = window.innerHeight;
     
@@ -515,7 +515,7 @@ const LandingPage = () => {
                       <div>
                         <h3 className="text-xl md:text-2xl font-extralight text-sky-400 mb-2">Step 6: Answer Generation with LLM</h3>
                         <p className="font-extralight">
-                          The retrieved chunks and the user's query are sent to a large language model (LLM) — such as Google Gemini — which analyzes the context and generates a precise, informative answer. The system ensures that the responses are contextually accurate and tailored to the uploaded material.
+                          The retrieved chunks and the user&apos;s query are sent to a large language model (LLM) — such as Google Gemini — which analyzes the context and generates a precise, informative answer. The system ensures that the responses are contextually accurate and tailored to the uploaded material.
                         </p>
                       </div>
                     </div>

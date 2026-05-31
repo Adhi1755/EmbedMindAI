@@ -1,0 +1,74 @@
+services:
+  # ─────────────────────────────────────────
+  # FastAPI Backend
+  # ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: embedmindai-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Persist uploaded PDFs and ChromaDB data across restarts
+      - backend_uploads:/app/uploads
+      - backend_chromadb:/app/chromadb_storage
+      # Hot-reload: mount source code in development
+      # Comment this out for production builds
+      - ./backend:/app
+    networks:
+      - embedmindai-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/test')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # ─────────────────────────────────────────
+  # Next.js Frontend
+  # ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: embedmindai-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Point the frontend at the backend service
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - embedmindai-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+# ─────────────────────────────────────────
+# Named volumes for persistent data
+# ─────────────────────────────────────────
+volumes:
+  backend_uploads:
+    driver: local
+  backend_chromadb:
+    driver: local
+
+# ─────────────────────────────────────────
+# Internal bridge network
+# ─────────────────────────────────────────
+networks:
+  embedmindai-network:
+    driver: bridge

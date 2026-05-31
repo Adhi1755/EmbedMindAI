@@ -1,0 +1,46 @@
+# ── Environment & Secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+env/
+.venv/
+ENV/
+
+# ── Distribution ──────────────────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# ── Test & coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Type checking ─────────────────────────────────────────────────────────────
+.mypy_cache/
+
+# ── Data directories (persisted via Docker volumes, not in git) ───────────────
+uploads/
+chromadb_storage/
+
+# ── HuggingFace model cache (large, downloaded at Docker build time) ──────────
+.cache/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log

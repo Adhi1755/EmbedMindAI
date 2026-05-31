@@ -1,0 +1,25 @@
+# Dependencies (reinstalled fresh inside container)
+node_modules/
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Docs
+README.md
+*.md

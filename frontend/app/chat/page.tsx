@@ -9,7 +9,7 @@ import 'github-markdown-css/github-markdown.css';
 import FileUpload from './FileUpload';
 import { jwtDecode } from 'jwt-decode';
 import { Copy, Check, FileText, Zap, Brain, BookOpen } from 'lucide-react';
-import { useChatStore } from '../components/stores/ChatStore';
+import { useChatStore, saveMessageToBackend } from '../components/stores/ChatStore';
 import { useUploadStore } from '../components/stores/UploadStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -227,8 +227,11 @@ const ChatContainer: React.FC = () => {
     const userMsg: Message = { id: Date.now(), sender: 'user', text: text.trim(), timestamp: Date.now() };
     setMessages((prev) => [...prev, userMsg]);
 
-    if (sessionIdRef.current) {
-      addMessage(sessionIdRef.current, { sender: 'user', text: text.trim() });
+    const sid = sessionIdRef.current;
+    if (sid) {
+      addMessage(sid, { sender: 'user', text: text.trim() });
+      // Persist to MongoDB
+      saveMessageToBackend(sid, 'user', text.trim());
     }
 
     setIsThinking(true);
@@ -238,8 +241,10 @@ const ChatContainer: React.FC = () => {
       const aiMsg: Message = { id: Date.now() + 1, sender: 'ai', text: aiReply || 'No answer returned.', timestamp: Date.now() };
       setMessages((prev) => [...prev, aiMsg]);
 
-      if (sessionIdRef.current) {
-        addMessage(sessionIdRef.current, { sender: 'ai', text: aiReply || 'No answer returned.' });
+      if (sid) {
+        addMessage(sid, { sender: 'ai', text: aiReply || 'No answer returned.' });
+        // Persist to MongoDB
+        saveMessageToBackend(sid, 'ai', aiReply || 'No answer returned.');
       }
     } catch {
       const errMsg: Message = { id: Date.now() + 1, sender: 'ai', text: 'Something went wrong. Please try again.', timestamp: Date.now() };
@@ -248,7 +253,6 @@ const ChatContainer: React.FC = () => {
       setIsThinking(false);
     }
   }, [addMessage]);
-
   const handleSuggestion = useCallback((text: string) => {
     handleSendMessage(text);
   }, [handleSendMessage]);

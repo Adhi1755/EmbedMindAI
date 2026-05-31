@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useLayoutEffect, useRef, useCallback } from 'react';
-import { Menu, X, Plus, Search, UserCircle2, Trash2, MessageSquare, FileText } from 'lucide-react';
+import { Menu, X, Plus, Search, Trash2, MessageSquare, FileText } from 'lucide-react';
 import Image from 'next/image';
 import clsx from 'clsx';
 import gsap from 'gsap';
@@ -36,19 +36,41 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const headerRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
 
-  const { sessions, activeSessionId, setActiveSession, createSession, deleteSession, clearSession } = useChatStore();
+  const { sessions, activeSessionId, setActiveSession, createSession, deleteSession, clearSession, hydrateFromBackend, loadMessagesForSession } = useChatStore();
   const { uploadedFile } = useUploadStore();
 
-  // Load user
+  // Load user then hydrate sessions from backend
   useEffect(() => {
     fetch(`${API_URL}/auth/me`, { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error('Unauthenticated');
         return res.json();
       })
-      .then((data) => {
+      .then(async (data) => {
         const userInfo: User = data.token ? jwtDecode<GoogleUser>(data.token) : data;
         setUser(userInfo);
+
+        // Hydrate sessions from backend
+        try {
+          const res2 = await fetch(`${API_URL}/chat/sessions`, { credentials: 'include' });
+          if (res2.ok) {
+            const backendSessions = await res2.json();
+            // Map backend shape → ChatSession shape
+            const mapped = backendSessions.map((s: any) => ({
+              id:        s.session_id,
+              title:     s.title,
+              messages:  [],           // loaded lazily on switch
+              createdAt: new Date(s.created_at).getTime(),
+              updatedAt: new Date(s.updated_at).getTime(),
+              pdfName:   s.pdf_name,
+              synced:    true,
+            }));
+            hydrateFromBackend(mapped);
+          }
+        } catch {
+          // If backend is unreachable, local store still works
+        }
+
         setTimeout(() => setLoginLoading(false), 400);
       })
       .catch(() => {
@@ -86,6 +108,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       clearSession(activeSessionId);
     }
   }, [activeSessionId, clearSession]);
+
+  // Load messages from backend when switching to a session with no local messages
+  const handleSelectSession = useCallback(async (id: string) => {
+    setActiveSession(id);
+    const session = sessions.find((s) => s.id === id);
+    if (session && session.messages.length === 0) {
+      await loadMessagesForSession(id);
+    }
+  }, [setActiveSession, sessions, loadMessagesForSession]);
 
   const filteredSessions = sessions.filter((s) =>
     s.title.toLowerCase().includes(search.toLowerCase())
@@ -141,7 +172,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               searchOpen={searchOpen}
               setSearchOpen={setSearchOpen}
               onNewChat={handleNewChat}
-              onSelectSession={(id) => { setActiveSession(id); setIsMobileOpen(false); }}
+              onSelectSession={(id) => { handleSelectSession(id); setIsMobileOpen(false); }}
               onDeleteSession={deleteSession}
               uploadedFileName={uploadedFile?.name}
             />
@@ -191,7 +222,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           searchOpen={searchOpen}
           setSearchOpen={setSearchOpen}
           onNewChat={handleNewChat}
-          onSelectSession={setActiveSession}
+          onSelectSession={handleSelectSession}
           onDeleteSession={deleteSession}
           uploadedFileName={uploadedFile?.name}
         />

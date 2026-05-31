@@ -1,7 +1,7 @@
 # auth.py — Persistent sessions via MongoDB + configurable redirect URIs
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 import os, secrets
 from dotenv import load_dotenv
 import httpx
@@ -9,6 +9,7 @@ from pymongo import MongoClient
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
+from database import get_db
 
 router = APIRouter()
 load_dotenv()
@@ -22,18 +23,10 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 REDIRECT_URI = f"{BACKEND_URL}/auth/callback"
 
 # ── MongoDB session store ─────────────────────────────────────────────────────
-_mongo_client = None
 
 def _get_sessions_collection():
-    """Lazily initialize MongoDB connection and return sessions collection."""
-    global _mongo_client
-    if _mongo_client is None:
-        uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/embedmindai")
-        _mongo_client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-        # TTL index: sessions expire after 7 days automatically
-        db = _mongo_client.get_default_database()
-        db.sessions.create_index("expires_at", expireAfterSeconds=0)
-    return _mongo_client.get_default_database().sessions
+    """Return the sessions collection from the shared DB client."""
+    return get_db().sessions
 
 SESSION_TTL_DAYS = 7
 
@@ -150,22 +143,37 @@ async def auth_callback(request: Request, code: str):
         user_response = await client.get(user_info_url, headers=headers)
         user_data = user_response.json()
 
-    session_token = secrets.token_hex(32)
-    _store_session(session_token, {
-        "name":    user_data["name"],
-        "email":   user_data["email"],
-        "picture": user_data.get("picture"),
-    })
+    now = datetime.now(timezone.utc)
+    user_email = user_data["email"]
 
-    response = RedirectResponse(url=f"{FRONTEND_URL}/chat")
-    response.set_cookie(
-        key="session_token",
-        value=session_token,
-        httponly=True,
-        samesite="lax",
-        max_age=SESSION_TTL_DAYS * 86400,
+    # ── Upsert full user profile in users collection ───────────────────────
+    db = get_db()
+    db.users.update_one(
+        {"email": user_email},
+        {
+            "$set": {
+                "name":          user_data["name"],
+                "picture":       user_data.get("picture"),
+                "provider":      "google",
+                "last_login_at": now,
+            },
+            "$setOnInsert": {
+                "email":      user_email,
+                "created_at": now,
+                "login_count": 0,
+                "settings":   {"theme": "dark", "language": "en"},
+            },
+            "$inc": {"login_count": 1},
+        },
+        upsert=True,
     )
-    return response
+
+    user_payload = {
+        "name":    user_data["name"],
+        "email":   user_email,
+        "picture": user_data.get("picture"),
+    }
+    return _create_session_response(user_payload, redirect_url=f"{FRONTEND_URL}/chat")
 
 
 @router.get("/auth/me")
@@ -194,21 +202,25 @@ def logout(request: Request):
 @router.post("/auth/register")
 async def register(body: RegisterRequest):
     """Create a new user with email + password."""
-    sessions = _get_sessions_collection()
-    db = sessions.database
+    db = get_db()
     users = db.users
 
     # Check if user already exists
     if users.find_one({"email": body.email}):
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
 
+    now = datetime.now(timezone.utc)
     hashed = _hash_password(body.password)
     users.insert_one({
-        "name": body.name,
-        "email": body.email,
+        "name":          body.name,
+        "email":         body.email,
         "password_hash": hashed,
-        "provider": "email",
-        "created_at": datetime.now(timezone.utc),
+        "provider":      "email",
+        "picture":       None,
+        "created_at":    now,
+        "last_login_at": now,
+        "login_count":   1,
+        "settings":      {"theme": "dark", "language": "en"},
     })
 
     user_data = {"name": body.name, "email": body.email, "picture": None}
@@ -218,17 +230,44 @@ async def register(body: RegisterRequest):
 @router.post("/auth/email-login")
 async def email_login(body: LoginRequest):
     """Sign in with email + password."""
-    sessions = _get_sessions_collection()
-    db = sessions.database
+    db = get_db()
     users = db.users
 
     user_doc = users.find_one({"email": body.email})
     if not user_doc or not _verify_password(body.password, user_doc.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
 
+    # Update login metadata
+    users.update_one(
+        {"email": body.email},
+        {
+            "$set": {"last_login_at": datetime.now(timezone.utc)},
+            "$inc": {"login_count": 1},
+        },
+    )
+
     user_data = {
-        "name": user_doc["name"],
-        "email": user_doc["email"],
+        "name":    user_doc["name"],
+        "email":   user_doc["email"],
         "picture": user_doc.get("picture"),
     }
     return _create_session_response(user_data)
+
+
+@router.get("/auth/profile")
+def get_profile(request: Request):
+    """Return the full user profile document (without password_hash)."""
+    from database import require_current_user
+    user = require_current_user(request)
+    db = get_db()
+    doc = db.users.find_one(
+        {"email": user["email"]},
+        {"_id": 0, "password_hash": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Convert datetime fields to ISO strings for JSON serialisation
+    for field in ("created_at", "last_login_at"):
+        if field in doc and doc[field]:
+            doc[field] = doc[field].isoformat()
+    return doc

@@ -4,15 +4,15 @@
 
 /* ── Design Tokens ───────────────────────────────────────────────── */
 :root {
-  --brand-primary: #38bdf8;   /* sky-400 */
-  --brand-secondary: #2563eb; /* blue-600 */
+  --brand-primary: #38bdf8;
+  --brand-secondary: #2563eb;
   --brand-glow: rgba(56, 189, 248, 0.25);
-  --bg-glass: rgba(255, 255, 255, 0.04);
-  --bg-glass-hover: rgba(255, 255, 255, 0.08);
-  --border-glass: rgba(255, 255, 255, 0.1);
+  --bg-glass: rgba(255, 255, 255, 0.03);
+  --bg-glass-hover: rgba(255, 255, 255, 0.06);
+  --border-glass: rgba(255, 255, 255, 0.08);
   --border-glass-strong: rgba(56, 189, 248, 0.3);
-  --shadow-glow: 0 0 40px rgba(56, 189, 248, 0.15);
-  --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 40px rgba(56, 189, 248, 0.12);
+  --shadow-card: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Base ────────────────────────────────────────────────────────── */
@@ -24,16 +24,15 @@ body {
 }
 
 /* ── Scrollbar ───────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.25); border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(56,189,248,0.5); }
+::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.2); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(56,189,248,0.4); }
 
-/* ── Orbit animation (for OrbitingCircles) ───────────────────────── */
+/* ── Orbit animation ─────────────────────────────────────────────── */
 @theme inline {
   --animate-orbit: orbit calc(var(--duration) * 1s) linear infinite;
 }
-
 @keyframes orbit {
   0% {
     transform: rotate(calc(var(--angle) * 1deg))
@@ -53,12 +52,19 @@ body {
     animation: gradient-curl 5s ease infinite;
   }
 }
-
 @keyframes gradient-curl {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+/* ── Marquee scroll ──────────────────────────────────────────────── */
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee-track { animation: marquee-scroll 28s linear infinite; }
+.marquee-track:hover { animation-play-state: paused; }
 
 /* ── Spin ────────────────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -80,13 +86,13 @@ body {
   animation: shimmer 2.5s linear infinite;
 }
 
-/* ── Typing dots (AI thinking) ───────────────────────────────────── */
+/* ── Typing dots ─────────────────────────────────────────────────── */
 @keyframes blink {
   0%, 80%, 100% { opacity: 0; transform: scale(0.7); }
   40%           { opacity: 1; transform: scale(1); }
 }
 .typing-dot {
-  width: 7px; height: 7px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--brand-primary);
   display: inline-block;
@@ -96,82 +102,95 @@ body {
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
-/* ── Modal backdrop ──────────────────────────────────────────────── */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+/* ── Glow pulse ──────────────────────────────────────────────────── */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
 }
+.live-dot { animation: glow-pulse 2s ease-in-out infinite; }
+
+/* ── Fade-in up ──────────────────────────────────────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 0.4s ease forwards; }
+
+/* ── Modal backdrop ──────────────────────────────────────────────── */
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(24px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .modal-backdrop { animation: fadeIn 0.2s ease forwards; }
 .modal-panel    { animation: slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
 
-/* ── Glassmorphism card ──────────────────────────────────────────── */
+/* ── Glass card ──────────────────────────────────────────────────── */
 .glass-card {
   background: var(--bg-glass);
   border: 1px solid var(--border-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
 }
 .glass-card:hover {
   background: var(--bg-glass-hover);
-  border-color: var(--border-glass-strong);
-  box-shadow: var(--shadow-glow);
+  border-color: rgba(56,189,248,0.18);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.5), 0 0 1px rgba(56,189,248,0.08);
+  transform: translateY(-2px);
 }
 
 /* ── Feature card hover ──────────────────────────────────────────── */
-.feature-card {
-  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-}
-.feature-card:hover {
-  transform: translateY(-4px);
+.feature-card { transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease; }
+.feature-card:hover { transform: translateY(-4px); }
+
+/* ── Dot grid background ─────────────────────────────────────────── */
+.bg-dot-grid {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
 /* ── Code blocks ─────────────────────────────────────────────────── */
 code {
-  background-color: #161b22;
-  color: #c9d1d9;
-  padding: 0.2em 0.4em;
+  background-color: #0d1117;
+  color: #38bdf8;
+  padding: 0.15em 0.45em;
   border-radius: 0.3rem;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  border: 1px solid rgba(56,189,248,0.15);
 }
-
 pre {
-  background-color: #0d1117 !important;
+  background-color: #0a0e17 !important;
   color: #c9d1d9 !important;
-  padding: 1rem 1.25rem;
-  border-radius: 0.5rem;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
   overflow-x: auto;
   margin-top: 0.75rem;
   font-size: 0.85rem;
-  border: none !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
   box-shadow: none;
 }
 
 /* ── Pulse badge ─────────────────────────────────────────────────── */
 @keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4); }
-  70%  { box-shadow: 0 0 0 8px rgba(56, 189, 248, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(56,189,248,0.4); }
+  70%  { box-shadow: 0 0 0 8px rgba(56,189,248,0); }
+  100% { box-shadow: 0 0 0 0 rgba(56,189,248,0); }
 }
 .pulse-badge { animation: pulse-ring 2.5s ease-out infinite; }
 
-/* ── Message bubble copy button ──────────────────────────────────── */
+/* ── Message copy button ─────────────────────────────────────────── */
 .msg-group:hover .copy-btn { opacity: 1; }
 .copy-btn { opacity: 0; transition: opacity 0.2s ease; }
 
 /* ── Input focus glow ────────────────────────────────────────────── */
 .input-glow:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 0 2px rgba(56,189,248,0.35);
 }
 
 /* ── Gradient border trick ───────────────────────────────────────── */
-.gradient-border {
-  position: relative;
-}
+.gradient-border { position: relative; }
 .gradient-border::before {
   content: '';
   position: absolute;
@@ -183,3 +202,15 @@ pre {
   transition: opacity 0.3s ease;
 }
 .gradient-border:hover::before { opacity: 1; }
+
+/* ── Model info bar status dot ───────────────────────────────────── */
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* ── Tech badge ──────────────────────────────────────────────────── */
+.tech-badge { transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease; }
+.tech-badge:hover { transform: scale(1.04); }

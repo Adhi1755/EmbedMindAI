@@ -1,5 +1,25 @@
 services:
   # ─────────────────────────────────────────
+  # MongoDB (session store for auth)
+  # ─────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: embedmindai-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - embedmindai-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+
+  # ─────────────────────────────────────────
   # FastAPI Backend
   # ─────────────────────────────────────────
   backend:
@@ -14,13 +34,17 @@ services:
       - ./backend/.env
     environment:
       - PYTHONUNBUFFERED=1
+      # Inside Docker, use the service name "mongo" as the hostname
+      - MONGODB_URI=mongodb://mongo:27017/embedmindai
     volumes:
-      # Persist uploaded PDFs and ChromaDB data across restarts
       - backend_uploads:/app/uploads
       - backend_chromadb:/app/chromadb_storage
       # Hot-reload: mount source code in development
       # Comment this out for production builds
       - ./backend:/app
+    depends_on:
+      mongo:
+        condition: service_healthy
     networks:
       - embedmindai-network
     healthcheck:
@@ -43,7 +67,6 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      # Point the frontend at the backend service
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       backend:
@@ -64,6 +87,8 @@ volumes:
   backend_uploads:
     driver: local
   backend_chromadb:
+    driver: local
+  mongo_data:
     driver: local
 
 # ─────────────────────────────────────────

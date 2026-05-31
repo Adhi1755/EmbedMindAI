@@ -1,11 +1,14 @@
 # auth.py — Persistent sessions via MongoDB + configurable redirect URIs
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
+from pydantic import BaseModel, EmailStr
 import os, secrets
 from dotenv import load_dotenv
 import httpx
 from pymongo import MongoClient
 from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 
 router = APIRouter()
 load_dotenv()
@@ -35,6 +38,38 @@ def _get_sessions_collection():
 SESSION_TTL_DAYS = 7
 
 
+# ── Password hashing (stdlib only – no bcrypt dependency) ────────────────────
+
+def _hash_password(password: str) -> str:
+    """Hash a password using PBKDF2-HMAC-SHA256."""
+    salt = os.urandom(16)
+    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 260_000)
+    return salt.hex() + ':' + key.hex()
+
+def _verify_password(password: str, stored: str) -> bool:
+    """Verify a password against its stored hash."""
+    try:
+        salt_hex, key_hex = stored.split(':')
+        salt = bytes.fromhex(salt_hex)
+        key = bytes.fromhex(key_hex)
+        new_key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 260_000)
+        return hmac.compare_digest(key, new_key)
+    except Exception:
+        return False
+
+
+# ── Pydantic models ──────────────────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
 def _store_session(token: str, user_data: dict) -> None:
     sessions = _get_sessions_collection()
     sessions.replace_one(
@@ -58,6 +93,25 @@ def _get_session(token: str) -> dict | None:
 def _delete_session(token: str) -> None:
     sessions = _get_sessions_collection()
     sessions.delete_one({"token": token})
+
+
+# ── Helper: create session and set cookie ────────────────────────────────────
+
+def _create_session_response(user_data: dict, redirect_url: str | None = None) -> JSONResponse:
+    session_token = secrets.token_hex(32)
+    _store_session(session_token, user_data)
+    if redirect_url:
+        response = RedirectResponse(url=redirect_url)
+    else:
+        response = JSONResponse(content={"ok": True, "user": user_data})
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        samesite="lax",
+        max_age=SESSION_TTL_DAYS * 86400,
+    )
+    return response
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
@@ -133,3 +187,48 @@ def logout(request: Request):
     response = JSONResponse(content={"message": "Logged out successfully"})
     response.delete_cookie("session_token")
     return response
+
+
+# ── Email / Password Auth ─────────────────────────────────────────────────────
+
+@router.post("/auth/register")
+async def register(body: RegisterRequest):
+    """Create a new user with email + password."""
+    sessions = _get_sessions_collection()
+    db = sessions.database
+    users = db.users
+
+    # Check if user already exists
+    if users.find_one({"email": body.email}):
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+
+    hashed = _hash_password(body.password)
+    users.insert_one({
+        "name": body.name,
+        "email": body.email,
+        "password_hash": hashed,
+        "provider": "email",
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    user_data = {"name": body.name, "email": body.email, "picture": None}
+    return _create_session_response(user_data)
+
+
+@router.post("/auth/email-login")
+async def email_login(body: LoginRequest):
+    """Sign in with email + password."""
+    sessions = _get_sessions_collection()
+    db = sessions.database
+    users = db.users
+
+    user_doc = users.find_one({"email": body.email})
+    if not user_doc or not _verify_password(body.password, user_doc.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    user_data = {
+        "name": user_doc["name"],
+        "email": user_doc["email"],
+        "picture": user_doc.get("picture"),
+    }
+    return _create_session_response(user_data)

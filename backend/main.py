@@ -151,8 +151,8 @@ async def upload_pdf(file: UploadFile = File(...)):
                 "text_length": len(text),
                 "chunks_created": len(pdf_chunks),
                 "embedding_dimensions": pdf_embeddings.shape[1] if pdf_embeddings.size > 0 else 0,
-                "processing_model": MODEL_NAME,
-                "vector_store": "ChromaDB",  # Updated to reflect ChromaDB usage
+                "embedding_model": "text-embedding-004",
+                "vector_store": "ChromaDB",
                 "collection_saved": True
             },
             "status": "success"
@@ -214,5 +214,5 @@ async def ask_question(query: str = Form(...)):
     for i, c in enumerate(relevant):
         print(f"\n--- Chunk {i+1} ---\n{c}")
 
-    response = ask_llm(query, "\n".join(relevant))
+    response = ask_llm(query, relevant)
     return {"answer": response}

@@ -160,7 +160,6 @@ async def auth_callback(request: Request, code: str):
             "$setOnInsert": {
                 "email":      user_email,
                 "created_at": now,
-                "login_count": 0,
                 "settings":   {"theme": "dark", "language": "en"},
             },
             "$inc": {"login_count": 1},
